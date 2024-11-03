@@ -29,6 +29,8 @@ class EmotionalFluorescentPinkDinosaur(QCAlgorithm):
     def OnData(self, data: Slice):
         # Ensure invalid pairs are removed.
         valid_symbols = []
+        upperThresh = 1
+        lowerThresh = -1
 
         for i in range(0, len(self.tickers), 2):
             if (self.symbols[self.tickers[i]] in data.Keys and 
@@ -51,15 +53,16 @@ class EmotionalFluorescentPinkDinosaur(QCAlgorithm):
 
             if (symbol1 in valid_symbols and symbol2 in valid_symbols):
                 z_scores[(ticker1, ticker2)] = self.calculate_z_score(self.price_windows[symbol1], self.price_windows[symbol2])
+                upperThresh, lowerThresh = self.calculate_z_threshold()
 
         self.Debug(f"Z-scores: {z_scores}")
         # Check for entry/exit signals based on z-scores
         for (ticker1, ticker2), z_score in z_scores.items():
-            if z_scores[((ticker1, ticker2))] > 1:
+            if z_scores[((ticker1, ticker2))] > upperThresh:
                 self.SetHoldings(self.symbols[ticker1], -1.5)
                 self.SetHoldings(self.symbols[ticker2], 1.5)
                 self.Debug(f"short {ticker1} long {ticker2} zscore {z_score}")
-            elif z_scores[((ticker1, ticker2))] < -1:
+            elif z_scores[((ticker1, ticker2))] < lowerThresh:
                 self.SetHoldings(self.symbols[ticker1], 1.5)
                 self.SetHoldings(self.symbols[ticker2], -1.5)
                 self.Debug(f"long {ticker1} short {ticker2} zscore {z_score}")
@@ -87,7 +90,7 @@ class EmotionalFluorescentPinkDinosaur(QCAlgorithm):
         # Calculate recent z scores
         recent_z_scores = []
         for symbol in self.symbols.values():
-            if len(self.price_windows[symbol]) == self.lookback:
+            if self.price_windows[symbol].count == self.lookback:
                 for i in range(0, len(self.tickers), 2):
                     ticker1 = self.tickers[i]
                     ticker2 = self.tickers[i + 1]
@@ -97,11 +100,12 @@ class EmotionalFluorescentPinkDinosaur(QCAlgorithm):
         if (recent_z_scores != None):
             mean_z = np.mean(recent_z_scores)
             std_z = np.std(recent_z_scores)
-
             # 
             entry_threshold = mean_z + std_z
             exit_threshold = mean_z - std_z  
 
+
+            print ("entry: ", entry_threshold, " exti: ", exit_threshold)
             return entry_threshold, exit_threshold
         
         return 1, -1 # default threshold.
